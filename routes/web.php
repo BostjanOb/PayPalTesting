@@ -18,3 +18,4 @@ Route::get('/', function () {
 Route::get('paypal', 'PayPalController@init')->name('paypal');
 Route::get('paypal/success', 'PayPalController@success')->name('paypal.success');
 Route::get('paypal/cancel', 'PayPalController@cancel')->name('paypal.cancel');
+Route::get('paypal/view/{paypal}', 'PayPalController@view')->name('paypal.view');
