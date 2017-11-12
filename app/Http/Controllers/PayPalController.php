@@ -6,7 +6,6 @@ use App\PayPal;
 use App\PayPalPayment;
 use Illuminate\Http\Request;
 
-
 class PayPalController extends Controller
 {
     /**
