@@ -3,48 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\PayPal;
+use App\PayPalPayment;
 use Illuminate\Http\Request;
-use PayPal\Api\Amount;
-use PayPal\Api\Payer;
-use PayPal\Api\Payment;
-use PayPal\Api\PaymentExecution;
-use PayPal\Api\RedirectUrls;
-use PayPal\Api\Transaction as PayPalTransaction;
-use PayPal\Auth\OAuthTokenCredential;
-use PayPal\Rest\ApiContext;
+
 
 class PayPalController extends Controller
 {
+    /**
+     * @var PayPalPayment
+     */
+    private $paypalPayment;
+
+    public function __construct(PayPalPayment $paypalPayment)
+    {
+        $this->paypalPayment = $paypalPayment;
+    }
 
     public function init()
     {
         $paypal = factory(PayPal::class)->create();
 
-        $payment = new Payment();
-        $payment->setIntent('sale');
-
-        // set payer
-        $payer = new Payer();
-        $payer->setPaymentMethod('paypal');
-        $payment->setPayer($payer);
-
-        // set transactions
-        $amount = new Amount();
-        $amount->setCurrency('EUR')
-            ->setTotal($paypal->price);
-
-        $transactions = new PayPalTransaction();
-        $transactions->setAmount($amount)
-            ->setDescription('Paywall payment using Paywall.');
-        $payment->setTransactions([$transactions]);
-
-        // set redirect urls
-        $redirects = new RedirectUrls();
-        $redirects->setReturnUrl(route('paypal.success'))
-            ->setCancelUrl(route('paypal.cancel'));
-        $payment->setRedirectUrls($redirects);
-
-        $payment->create($this->getApi());
+        $payment = $this->paypalPayment->create($paypal);
 
         $paypal->update([
             'payment_id'   => $payment->id,
@@ -62,12 +41,7 @@ class PayPalController extends Controller
         $paypal = PayPal::where('payment_id', $request->input('paymentId', ''))->firstOrFail();
 
         try {
-            $payment = Payment::get($paypal->payment_id, $this->getApi());
-
-            $execution = new PaymentExecution();
-            $execution->setPayerId($request->input('PayerID', ''));
-
-            $payment = $payment->execute($execution, $this->getApi());
+            $payment = $this->paypalPayment->execute($paypal, $request->input('PayerID', ''));
 
             // Update paypal payment
             $paypal->update([
@@ -95,30 +69,4 @@ class PayPalController extends Controller
     {
         return $paypal;
     }
-
-    /**
-     * @return ApiContext
-     */
-    private function getApi(): ApiContext
-    {
-        $api = new ApiContext(
-            new OAuthTokenCredential(
-                config('services.paypal.id'),
-                config('services.paypal.secret')
-            )
-        );
-
-        $api->setConfig([
-            'mode'                   => 'sandbox',
-            'http.ConnectionTimeOut' => 30,
-            'log.LogEnabled'         => true,
-            'log.FileName'           => storage_path('logs/PayPal.log'),
-            'log.LogLevel'           => 'INFO',
-            'validation.level'       => 'log',
-            'cache.enabled'          => true,
-        ]);
-
-        return $api;
-    }
-
 }
